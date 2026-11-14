@@ -122,6 +122,8 @@
 
     <!-- Questions will be inserted here by JavaScript -->
     <div id="quiz-container"></div>
+    <button type="button" id="restart-quiz">Start again</button>
+    <p>Your progress is saved in this browser when storage is available.</p>
   </div>
 
   <!-- Floating Score Tracker -->
@@ -166,6 +168,27 @@
     const quizContainer = document.getElementById('quiz-container');
     const scoreBoard = document.getElementById('score-board');
     
+    const storageKey = 'grade6-english-progress-v1';
+    const quizSignature = JSON.stringify(quizData);
+    const answers = Array(quizData.length).fill(null);
+    let savedAnswers = [];
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey));
+      if (saved?.quiz === quizSignature && Array.isArray(saved.answers)) savedAnswers = saved.answers;
+    } catch (_) { /* Storage may be unavailable or contain an old value. */ }
+    document.getElementById('restart-quiz').addEventListener('click', () => {
+      try { localStorage.removeItem(storageKey); } catch (_) {}
+      answers.fill(null);
+      score = 0;
+      answeredQuestions = 0;
+      quizContainer.querySelectorAll('.option-btn').forEach(button => {
+        button.disabled = false;
+        button.classList.remove('correct', 'wrong');
+      });
+      scoreBoard.style.background = '#1e293b';
+      updateScoreDisplay();
+    });
+
     let score = 0;
     let answeredQuestions = 0;
 
@@ -192,7 +215,7 @@
         button.innerText = optionText;
         
         // What happens when a student clicks an answer
-        button.onclick = () => handleAnswerClick(button, optionIndex, item.correctIndex, optionsGrid);
+        button.onclick = () => handleAnswerClick(button, optionIndex, item.correctIndex, optionsGrid, questionIndex);
         
         optionsGrid.appendChild(button);
       });
@@ -201,10 +224,16 @@
       quizContainer.appendChild(card);
     });
 
+    savedAnswers.forEach((answer, index) => {
+      if (Number.isInteger(answer) && answer >= 0 && answer < quizData[index]?.options.length) {
+        quizContainer.children[index].querySelectorAll('.option-btn')[answer].click();
+      }
+    });
+
     // Update the starting score text
     updateScoreDisplay();
 
-    function handleAnswerClick(clickedButton, selectedIndex, correctIndex, optionsGrid) {
+    function handleAnswerClick(clickedButton, selectedIndex, correctIndex, optionsGrid, questionIndex) {
       const allButtons = optionsGrid.querySelectorAll('.option-btn');
       
       // 1. Disable all buttons for this specific question so they can't change their answer
@@ -226,6 +255,10 @@
 
       // 3. Update the scoreboard
       answeredQuestions++;
+      answers[questionIndex] = selectedIndex;
+      try {
+        localStorage.setItem(storageKey, JSON.stringify({quiz: quizSignature, answers}));
+      } catch (_) { /* The quiz works even when persistence is unavailable. */ }
       updateScoreDisplay();
     }
 
